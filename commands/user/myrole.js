@@ -10,9 +10,6 @@ module.exports = {
    execute: withVerificationCheck(async (interaction) => {
     await interaction.deferReply({ ephemeral: true });
 
-    const result = await hasVerifiedRole(interaction);
-    if (!result.verified) return;
-
     const member = await interaction.guild.members.fetch(interaction.user.id);
     const roles = member.roles.cache
       .filter(role => role.id !== interaction.guild.id)
