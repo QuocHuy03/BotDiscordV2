@@ -1,0 +1,20 @@
+# Ignore environment variable files
+.env
+
+# Ignore sensitive credential files
+credentials.json
+
+# Ignore Python compiled files
+__pycache__/
+*.pyc
+
+# Ignore Node.js modules
+node_modules/
+
+# Ignore operating system generated files
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log
+log/
