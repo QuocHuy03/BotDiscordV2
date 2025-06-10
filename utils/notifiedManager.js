@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
+
 const notifiedPath = path.join(__dirname, "../data/notified.json");
 
 function getNotifiedUsers() {
@@ -14,8 +15,13 @@ function getNotifiedUsers() {
 }
 
 function saveNotifiedUsers(data) {
-  fs.writeFileSync(notifiedPath, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(notifiedPath, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error("❌ Failed to save notified.json:", err.message);
+  }
 }
+
 
 module.exports = {
   getNotifiedUsers,

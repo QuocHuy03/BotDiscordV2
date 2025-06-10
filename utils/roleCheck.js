@@ -1,6 +1,6 @@
 const { getSheetsInstance } = require("../ggsheet");
 
-const verifyRoleId = process.env.VERIFY_ROLE_ID;
+const verifyRoleId = process.env.TRUSTED_HUMAN_ROLE_ID;
 const level5RoleId = process.env.ROLE_LEVEL_5_ID;
 const spreadsheetId = process.env.SHEET_ID;
 const sheetName = process.env.SHEET_NAME;
