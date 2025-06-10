@@ -40,6 +40,7 @@ async function autoNotiTrusteds(client) {
           console.log(`✅ Granted role ${trustedRole.name} to ${username}`);
 
           if (!alreadyNotified) {
+            console.log(`🎉 You've been verified and granted the **${trustedRole.name}** role in the server!`)
             await member.send(`🎉 You've been verified and granted the **${trustedRole.name}** role in the server!`);
             if (!notifiedUsers[trustedRoleId]) notifiedUsers[trustedRoleId] = [];
             notifiedUsers[trustedRoleId].push(member.id);

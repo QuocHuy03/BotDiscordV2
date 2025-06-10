@@ -27,6 +27,6 @@ module.exports = {
 🙏 Thank you for following the rules! Let’s build a positive and respectful community together!
     `;
 
-    await interaction.reply({ content: rulesMessage, ephemeral: true });
+    await interaction.reply({ content: rulesMessage, ephemeral: false });
   },
 };

@@ -55,9 +55,8 @@ client.once("ready", async () => {
   console.log(`🖼️ Avatar URL: ${client.user.displayAvatarURL()}`);
   console.log(`✅ Bot đã online với tên: ${client.user.tag}`);
 
-
   // Cron chạy mỗi 2 phút
-  const job = new CronJob("*/30 * * * * *", async () => {
+  const job = new CronJob("*/10 * * * * *", async () => {
     console.log("🔄 Running auto task (every 10s)...");
     await autoNotiTrusteds(client);
   });
@@ -69,8 +68,12 @@ client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   const command = client.commands.get(interaction.commandName);
-  if (!command) return;
 
+  if (!command) {
+    console.log("⚠️ Command not found:", interaction.commandName);
+    return;
+  }
+  console.log("🧠 Running command:", interaction.commandName);
   try {
     await command.execute(interaction);
   } catch (error) {
