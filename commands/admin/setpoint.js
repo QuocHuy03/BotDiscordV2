@@ -1,5 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
 const { getSheetsInstance } = require("../../ggsheet");
+const { safeDefer } = require("../../utils/interactionUtils");
+const { queue } = require("../../utils/queue");
 
 const spreadsheetId = process.env.SHEET_ID;
 const sheetName = process.env.SHEET_NAME;
@@ -9,7 +11,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("setpoint")
     .setDescription("🎯 Set specific point value for a user")
-     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addUserOption(option =>
       option
         .setName("username")
@@ -19,63 +21,56 @@ module.exports = {
     .addIntegerOption(option =>
       option
         .setName("point")
-        .setDescription("New point value")
+        .setDescription("New point value (must be ≥ 0)")
         .setRequired(true)
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await safeDefer(interaction);
 
     const member = interaction.options.getMember("username");
     const point = interaction.options.getInteger("point");
 
     if (!member || !member.user?.username) {
-      return await interaction.editReply("⚠️ Invalid user selected.");
-    }
-
-    if (!Number.isInteger(point)) {
-      return await interaction.editReply("⚠️ Point must be an integer.");
+      return interaction.editReply("⚠️ Invalid user selected.");
     }
 
     if (point < 0) {
-      return await interaction.editReply("⚠️ Point cannot be negative.");
+      return interaction.editReply("⚠️ Point must be a non-negative integer.");
     }
 
     const username = member.user.username;
 
-    try {
-      const sheets = await getSheetsInstance();
-      const res = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range,
-      });
-      const rows = res.data.values || [];
+    return queue.add(async () => {
+      try {
+        const sheets = await getSheetsInstance();
+        const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+        const rows = res.data.values || [];
 
-      const index = rows.findIndex(
-        r => r[1]?.trim().toLowerCase() === username.toLowerCase()
-      );
+        const index = rows.findIndex(
+          r => r[1]?.trim().toLowerCase() === username.toLowerCase()
+        );
 
-      if (index === -1) {
-        return await interaction.editReply(`❌ User \`${username}\` not found in sheet.`);
+        if (index === -1) {
+          return interaction.editReply(`❌ User \`${username}\` not found in sheet.`);
+        }
+
+        const targetRange = `${sheetName}!C${index + 2}`;
+
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: targetRange,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [[point]] },
+        });
+
+        await interaction.editReply(
+          `✅ Updated **${member.user.tag}**'s points to **${point} ITLG** <:itlgcoin:1329529870916517940>`
+        );
+      } catch (err) {
+        console.error("🔥 Error while setting point:", err);
+        await interaction.editReply("❌ Failed to update points. Please try again or check Google Sheet connection.");
       }
-
-      const targetRow = index + 2;
-
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: `${sheetName}!C${targetRow}`,
-        valueInputOption: "USER_ENTERED",
-        requestBody: { values: [[point]] },
-      });
-
-      await interaction.editReply(
-        `✅ Set **${member.user.tag}**'s points to **${point} ITLG**`
-      );
-    } catch (err) {
-      console.error("🔥 Error while setting point:", err);
-      await interaction.editReply(
-        "❌ Failed to update points. Please check Sheets connection."
-      );
-    }
+    });
   },
 };

@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { getSheetData } = require("../../ggsheet");
-const { withVerificationCheck } = require("../../utils/withVerificationCheck");
+const { safeDefer } = require("../../utils/interactionUtils");
+const queue = require("../../utils/queue");
 
 const spreadsheetId = process.env.SHEET_ID;
 const sheetRange = `${process.env.SHEET_NAME}!A2:C`;
@@ -10,37 +11,35 @@ module.exports = {
     .setName("profile")
     .setDescription("Check your official ITLG score from Interlink"),
 
-  execute: withVerificationCheck(async (interaction) => {
-    try {
-      await interaction.deferReply({ ephemeral: true });
+  async execute(interaction) {
+    await safeDefer(interaction);
+    const username = interaction.user.username;
 
-      const username = interaction.user.username;
-      const rows = await getSheetData(spreadsheetId, sheetRange);
-      console.log("Rows from sheet:", rows);
+    await interaction.editReply("⏳ Fetching your official ITLG profile...");
 
-      const row = rows.find((r) => r[1] === username);
+    await queue.add(async () => {
+      try {
+        const rows = await getSheetData(spreadsheetId, sheetRange);
+        const row = rows.find((r) => r[1] === username);
 
-      if (row) {
-        await interaction.editReply(
-          `👤 **${username}** currently has **${row[2] || 0} ITLG** 🏆`
-        );
-      } else {
-        await interaction.editReply(
-          `❌ No ITLG record found for **${username}**.`
-        );
-      }
-    } catch (error) {
-      console.error("❌ Error executing /profile:", error);
-      if (interaction.deferred) {
-        await interaction.editReply(
-          "❌ An error occurred while processing your request."
-        );
-      } else {
-        await interaction.reply({
-          content: "❌ An error occurred while processing your request.",
+        if (row) {
+          await interaction.followUp({
+            content: `👤 **${username}** currently has **${row[2] || 0} ITLG** <:itlgcoin:1329529870916517940>`,
+            ephemeral: true,
+          });
+        } else {
+          await interaction.followUp({
+            content: `❌ No ITLG record found for **${username}**.`,
+            ephemeral: true,
+          });
+        }
+      } catch (error) {
+        console.error("❌ Error executing /profile:", error);
+        await interaction.followUp({
+          content: "❌ An error occurred while processing your request. Please try again later.",
           ephemeral: true,
         });
       }
-    }
-  }),
+    });
+  },
 };

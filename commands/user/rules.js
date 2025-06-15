@@ -1,4 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
+const { safeDefer } = require("../../utils/interactionUtils");
+const queue = require("../../utils/queue");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -6,27 +8,34 @@ module.exports = {
     .setDescription("📜 Display the community rules to prevent spam"),
 
   async execute(interaction) {
-    
-    const rulesMessage = `
+    await safeDefer(interaction);
+    await interaction.editReply("📜 Loading community rules...");
+
+    await queue.add(async () => {
+      const rulesMessage = `
 📌 **INTERLINK COMMUNITY RULES** 📌
 
 1️⃣ Do not spam messages, tags, emojis, or unrelated links.
 
-2️⃣ Respect Admins, Mods, and all members. No personal attacks.
+2️⃣ Respect **Admins**, **Mods**, and all members. No personal attacks or toxic behavior.
 
-3️⃣ No sharing of inappropriate content, politics, hate speech, or illegal material.
+3️⃣ Strictly no sharing of **NSFW**, political, hate speech, or illegal content.
 
-4️⃣ No advertising or inviting to other groups/Discords without permission.
+4️⃣ Advertising, DMs, or Discord invites **without permission** is prohibited.
 
-5️⃣ Use bot commands only for intended purposes. Each person is allowed **only ONE account**.
+5️⃣ Use bot commands only for intended purposes. Each member is allowed **ONE account only**.
 
-6️⃣ Violations may result in warnings, mutes, or permanent bans depending on severity.
+6️⃣ Violations may result in **warnings**, **mute**, or **permanent ban** depending on severity.
 
-👉 For questions, bug reports, or support, contact Admin in #support or tag directly.
+💬 For help, bug reports, or support, tag Admin or visit **#support**.
 
-🙏 Thank you for following the rules! Let’s build a positive and respectful community together!
-    `;
+🙏 Thank you for helping us maintain a safe, respectful, and positive community!
+      `;
 
-    await interaction.reply({ content: rulesMessage, ephemeral: false });
+      await interaction.followUp({
+        content: rulesMessage,
+        ephemeral: false, // public so everyone sees
+      });
+    });
   },
 };

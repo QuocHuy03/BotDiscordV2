@@ -1,5 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { getSheetsInstance } = require("../../ggsheet");
+const { safeDefer } = require("../../utils/interactionUtils");
+const queue = require("../../utils/queue");
 
 const spreadsheetId = process.env.SHEET_ID;
 const sheetName = process.env.SHEET_NAME;
@@ -8,7 +10,7 @@ const range = `${sheetName}!A2:C`;
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("myid")
-    .setDescription("Set or update your INTERLINK ID")
+    .setDescription("Set your INTERLINK ID (only once!)")
     .addStringOption(option =>
       option
         .setName("custom_id")
@@ -17,7 +19,7 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await safeDefer(interaction);
 
     const customId = interaction.options.getString("custom_id");
     const username = interaction.user.username;
@@ -30,43 +32,58 @@ module.exports = {
       return await interaction.editReply("❌ ID must be numeric only.");
     }
 
-    try {
-      const sheets = await getSheetsInstance();
-      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
-      const rows = res.data.values || [];
-      const foundIndex = rows.findIndex(row => row[1] === username);
+    // Phản hồi sớm để tránh interaction timeout
+    await interaction.editReply("⏳ Processing your request... Please wait a moment.");
 
-      let message = "";
+    // Đưa task vào hàng đợi
+    await queue.add(async () => {
+      try {
+        const sheets = await getSheetsInstance();
+        const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+        const rows = res.data.values || [];
 
-      if (foundIndex !== -1) {
-        const updateRange = `${sheetName}!A${foundIndex + 2}`;
-        await sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range: updateRange,
-          valueInputOption: "USER_ENTERED",
-          requestBody: {
-            values: [[`'${customId}`]],
-          },
+        const foundIndex = rows.findIndex(row => row[1] === username);
+        const foundRow = foundIndex !== -1 ? rows[foundIndex] : null;
+
+        if (foundRow && foundRow[0]) {
+          return await interaction.followUp({
+            content: `⚠️ You have already set your INTERLINK ID as **${foundRow[0]}**. It cannot be changed.`,
+            ephemeral: true,
+          });
+        }
+
+        if (foundRow) {
+          const updateRange = `${sheetName}!A${foundIndex + 2}`;
+          await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: updateRange,
+            valueInputOption: "USER_ENTERED",
+            requestBody: {
+              values: [[`'${customId}`]],
+            },
+          });
+        } else {
+          await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range,
+            valueInputOption: "USER_ENTERED",
+            requestBody: {
+              values: [[`'${customId}`, username, 0]],
+            },
+          });
+        }
+
+        await interaction.followUp({
+          content: `✅ Your INTERLINK ID **${customId}** has been saved successfully.`,
+          ephemeral: true,
         });
-
-        message = `✅ Your INTERLINK ID has been updated to **${customId}**.`;
-      } else {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId,
-          range,
-          valueInputOption: "USER_ENTERED",
-          requestBody: {
-            values: [[`'${customId}`, username, 0]],
-          },
+      } catch (err) {
+        console.error("🔥 Error in /myid queue:", err);
+        await interaction.followUp({
+          content: "❌ Something went wrong while saving your ID. Please try again later.",
+          ephemeral: true,
         });
-
-        message = `✅ INTERLINK ID **${customId}** saved successfully.`;
       }
-
-      await interaction.editReply(message);
-    } catch (err) {
-      console.error("🔥 Google Sheets error:", err.response?.data || err.message || err);
-      await interaction.editReply("❌ Failed to save your INTERLINK ID. Please try again later.");
-    }
+    });
   },
 };
